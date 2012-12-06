@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from setuptools import setup, find_packages
+from setuptools import setup
 
 setup(name='django-pxpay',
       version='0.1',
@@ -8,10 +8,10 @@ setup(name='django-pxpay',
       author_email="p.shpilev@gmail.com",
       description="PaymentExpress PxPay Gateway for Django",
       long_description=open('README.md').read(),
-      keywords="PxPay, Payment, PaymentExpress, Django, Python",
+      keywords="PxPay, Payment, PaymentExpress, DPS, Django, Python",
       license='BSD',
-      packages=find_packages(exclude=['sandbox*', 'tests*']),
-      install_requires=['requests>=0.13.5'],
+      packages=['pxpay',],
+      install_requires=['requests>=0.13.5', 'django>=1.4'],
       include_package_data=True,
       # See http://pypi.python.org/pypi?%3Aaction=list_classifiers
       classifiers=['Environment :: Web Environment',

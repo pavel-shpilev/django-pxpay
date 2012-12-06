@@ -1,8 +1,8 @@
 from django.conf import settings
+from pxpay.models import CURRENCY_CHOICES, TXN_TYPE_CHOICES
 from xml.dom.minidom import parseString, Document
 import re
 import requests
-from pxpay.models import CURRENCY_CHOICES, TXN_TYPE_CHOICES
 
 # Methods
 
@@ -17,8 +17,14 @@ UNABLE_TO_FULFILL_TRANSACTION = 'Unable to fulfill transaction'
 
 class Request(object):
 	"""
-	Represents a PaymentExpress request
-			self.required_keys = [
+	Represents a GenerateRequest request.
+	First request to PaymentExpress of two.
+	"""
+	root_element='GenerateRequest'
+	
+	def __init__(self, userid, passkey, currency, txn_type, kwargs):
+		self.data = {}
+		self.required_keys = [
 			'userid',
 			'passkey',
 			'amount',
@@ -27,9 +33,6 @@ class Request(object):
 			'url_fail',
 			'url_success',
 		]
-	"""
-	def __init__(self, userid, passkey, amount, currency, txn_type, url_fail, url_success):
-		self.data = {}
 		self.field_map = {
 			'userid': 'PxPayUserId',
 			'passkey': 'PxPayKey',
@@ -49,19 +52,15 @@ class Request(object):
 			'opt': 'Opt',
 		}
 		self.set_auth(userid, passkey)
-		self.set_element('amount', amount)
 		self.set_element('currency', currency)
 		self.set_element('txn_type', txn_type)
-		self.set_element('url_success', url_success)
-		self.set_element('url_fail', url_fail)
+		for element in kwargs:
+			self.set_element(element, kwargs[element])
 
 	@property
 	def request_xml(self):
-		"""
-		Return the string value of the request object
-		"""
 		doc = Document()
-		root = doc.createElement('GenerateRequest')
+		root = doc.createElement(self.root_element)
 		doc.appendChild(root)
 		for key, value in self.data.items():
 			field = self.field_map.get(key)
@@ -76,9 +75,6 @@ class Request(object):
 		self.data[name] = value
 
 	def _create_element(self, doc, parent, tag, value=None, attributes=None):
-		"""
-		Creates an XML element
-		"""
 		ele = doc.createElement(tag)
 		parent.appendChild(ele)
 		if value:
@@ -95,91 +91,71 @@ class Request(object):
 		return self.__unicode__()
 
 
+class Response_Request(Request):
+	"""
+	A ProcessResponse Request. The second of two.
+	How weird is that class name?
+	"""
+	root_element='ProcessResponse'
+	
+	def __init__(self, userid, passkey, response):
+		self.data = {}
+		self.required_keys = [
+			'userid',
+			'passkey',
+			'response',
+		]
+		self.field_map = {
+			'userid': 'PxPayUserId',
+			'passkey': 'PxPayKey',
+			'response': 'Response',
+		}
+		self.set_auth(userid, passkey)
+		self.set_element('response', response)
+
+
 class Response(object):
 	"""
-	Encapsulate a PaymentExpress response
+	Encapsulate a PxPay response.
 	"""
-
 	def __init__(self, request_xml, response_xml):
 		self.request_xml = request_xml
 		self.response_xml = response_xml
-		self.data = self._extract_data(response_xml)
+		self.response_parsed = self._extract_data(self.response_xml)
 
 	def _extract_data(self, response_xml):
 		if response_xml == '' \
 			or response_xml == '<?xml version="1.0" ?>' \
 			or response_xml is None:
 			return None
+		return parseString(response_xml)
+	
+	@property
+	def get_data(self):
+		if self.is_valid:
+			data = {}
+			for el in self.response_parsed.firstChild.childNodes:
+				data[el.nodeName] = self._get_element_val(el)
+			return data
+		return None
 
-		doc = parseString(response_xml)
-		success = self._get_transaction_attribute(doc, 'success')
-		authorised = self._get_element_text(doc, 'Authorized')
-		data = {
-			'success': int(success) if success else 0,
-			'response_code': self._get_transaction_attribute(doc, 'reco'),
-			'response_text': self._get_transaction_attribute(doc,
-				'responseText'),
-			'authorised': int(authorised) if authorised else 0,
-			'auth_code': self._get_element_text(doc, 'AuthCode'),
-			'txn_ref': self._get_element_text(doc, 'TxnRef'),
-			'dps_txn_ref': self._get_element_text(doc, 'DpsTxnRef'),
-			'card_holder_help_text': self._get_element_text(doc,
-				'CardHolderHelpText'),
-			'card_holder_response_text': self._get_element_text(doc,
-				'CardHolderResponseText'),
-			'help_text': self._get_element_text(doc, 'HelpText'),
-			'dps_billing_id': self._get_element_text(doc, 'DpsBillingId'),
-		}
-		return data
+	def _get_element_val(self, el):
+		if el.firstChild:
+			return el.firstChild.data
+		return None
 
-	def _try_get_element(self, doc, tag):
-		try:
-			ele = doc.getElementsByTagName(tag)[0]
-		except IndexError:
-			return None
-		return ele
-
-	def _get_transaction_attribute(self, doc, attr):
-		ele = self._try_get_element(doc, 'Transaction')
+	@property
+	def is_valid(self):
+		ele = self.response_parsed.firstChild
 		if ele is None or ele.attributes is None:
-			return ''
-		return ele.attributes.get(attr).value
-
-	def _get_element_text(self, doc, tag):
-		ele = self._try_get_element(doc, tag)
-		if ele is None or ele.firstChild is None:
-			return ''
-		return ele.firstChild.data
-
-	def get_message(self):
-		if self.data is None:
-			return UNABLE_TO_FULFILL_TRANSACTION
-		message = self.data['card_holder_help_text']
-		if message is None or message == '':
-			message = self.data['help_text']
-		return message
-
-	def __getitem__(self, key):
-		return self.data[key]
-
-	def is_successful(self):
-		if self.data is None:
 			return False
-		return self.data['success'] == 1 and self.data['authorised'] == 1
-
-	def is_declined(self):
-		if self.data is None:
-			return False
-		return self.data['success'] != 1 and \
-			self.data['authorised'] != 1 and \
-			self.data['card_holder_response_text'].startswith('DECLINED')
+		return int(ele.attributes.get('valid').value) == 1
 
 
 class Gateway(object):
 	"""
-	Transport class used to send PaymentExpress requests
+	Transport class and entry point.
 	"""
-
 	def __init__(self):
 		self.pxpay_url = self._get_settings('PXPAY_URL')
 		self.userid = self._get_settings('PXPAY_USERID')
@@ -190,15 +166,8 @@ class Gateway(object):
 		return getattr(settings, name, Exception("Please specify %s in settings." % name))
 
 	def _fetch_response(self, request):
-		"""
-		Sends the request
-		"""
 		self._check_kwargs(request.data, request.required_keys)
-		response = requests.post(
-			self.pxpay_url,
-			request.request_xml,
-			auth=(self.userid, self.passkey)
-		)
+		response = requests.post(self.pxpay_url, request.request_xml)
 		return Response(request.request_xml, response.text)
 
 	def _check_kwargs(self, kwargs, required_keys):
@@ -208,9 +177,7 @@ class Gateway(object):
 
 		for key in kwargs:
 			value = kwargs[key]
-#			if key == 'currency' and not re.match(r'^[A-Z]{3}$', value):
-#				raise ValueError('Currency code must be a 3 character code')
-			if key == 'currency' and key not in (k[0] for k in CURRENCY_CHOICES):
+			if key == 'currency' and value not in [k[0] for k in CURRENCY_CHOICES]:
 				raise ValueError('Currency code must be a 3 character code')
 			if key == 'amount' and value == 0:
 				raise ValueError('Amount must be non-zero')
@@ -220,18 +187,8 @@ class Gateway(object):
 				raise ValueError('%s must be in format mmyy' % key)
 
 	def _get_request(self, txn_type, kwargs, required_keys):
-		if 'amount' not in required_keys:
-			required_keys.append('amount')
-
 		self._check_kwargs(kwargs, required_keys)
-		request = Request(self.userid,
-					   self.passkey,
-					   self.currency,
-					   kwargs.get('amount'),
-					   txn_type,
-					   kwargs.get('fail_url'),
-					   kwargs.get('success_url')
-					   )
+		request = Request(self.userid, self.passkey, self.currency, txn_type, kwargs)
 		for key in required_keys:
 			request.set_element(key, kwargs.get(key))
 		return request
@@ -244,7 +201,7 @@ class Gateway(object):
 		request = self._get_request(AUTH, kwargs, [
 			'card_holder', 'card_number', 'cvc2', 'amount',
 		])
-		return self._fetch_response(request)
+		return self._fetch_request_response(request)
 
 	def complete(self, **kwargs):
 		"""
@@ -253,7 +210,7 @@ class Gateway(object):
 		must be supplied.
 		"""
 		request = self._get_request(COMPLETE, kwargs, ['dps_txn_ref', ])
-		return self._fetch_response(request)
+		return self._fetch_request_response(request)
 
 	def purchase(self, **kwargs):
 		"""
@@ -265,13 +222,20 @@ class Gateway(object):
 
 	def _purchase_on_new_card(self, **kwargs):
 		request = self._get_request(PURCHASE, kwargs, [
-			'card_holder', 'card_number', 'card_expiry', 'cvc2',
-			'merchant_ref', 'enable_add_bill_card',
+			'merchant_ref', 'url_fail', 'url_success'
 		])
 		return self._fetch_response(request)
 
 	def _purchase_on_existing_card(self, **kwargs):
 		request = self._get_request(PURCHASE, kwargs, ['dps_billing_id'])
+		return self._fetch_response(request)
+
+	def process_response(self, **kwargs):
+		"""
+		Post-processing transaction validation.
+		"""
+		self._check_kwargs(kwargs, ['result'])
+		request = Response_Request(self.userid, self.passkey, kwargs.get('result'))
 		return self._fetch_response(request)
 
 	def validate(self, **kwargs):
@@ -284,7 +248,7 @@ class Gateway(object):
 		request = self._get_request(AUTH, kwargs, [
 			'card_holder', 'card_number', 'cvc2', 'card_expiry',
 		])
-		return self._fetch_response(request)
+		return self._fetch_request_response(request)
 
 	def refund(self, **kwargs):
 		"""
@@ -294,4 +258,4 @@ class Gateway(object):
 		request = self._get_request(REFUND, kwargs, [
 			'dps_txn_ref', 'merchant_ref',
 		])
-		return self._fetch_response(request)
+		return self._fetch_request_response(request)
