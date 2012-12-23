@@ -160,7 +160,6 @@ class Gateway(object):
 		self.pxpay_url = self._get_settings('PXPAY_URL')
 		self.userid = self._get_settings('PXPAY_USERID')
 		self.passkey = self._get_settings('PXPAY_KEY')
-		self.currency = self._get_settings('PXPAY_CURRENCY')
 
 	def _get_settings(self, name):
 		return getattr(settings, name, Exception("Please specify %s in settings." % name))
@@ -216,18 +215,9 @@ class Gateway(object):
 		"""
 		Purchase - Funds are transferred immediately.
 		"""
-		if kwargs.get('dps_billing_id') is None:
-			return self._purchase_on_new_card(**kwargs)
-		return self._purchase_on_existing_card(**kwargs)
-
-	def _purchase_on_new_card(self, **kwargs):
 		request = self._get_request(PURCHASE, kwargs, [
 			'merchant_ref', 'url_fail', 'url_success'
 		])
-		return self._fetch_response(request)
-
-	def _purchase_on_existing_card(self, **kwargs):
-		request = self._get_request(PURCHASE, kwargs, ['dps_billing_id'])
 		return self._fetch_response(request)
 
 	def process_response(self, **kwargs):
