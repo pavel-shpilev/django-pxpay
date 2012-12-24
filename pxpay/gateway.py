@@ -160,6 +160,7 @@ class Gateway(object):
 		self.pxpay_url = self._get_settings('PXPAY_URL')
 		self.userid = self._get_settings('PXPAY_USERID')
 		self.passkey = self._get_settings('PXPAY_KEY')
+		self.currency = self._get_settings('PXPAY_CURRENCY')
 
 	def _get_settings(self, name):
 		return getattr(settings, name, Exception("Please specify %s in settings." % name))
