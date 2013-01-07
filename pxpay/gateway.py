@@ -4,72 +4,52 @@ from xml.dom.minidom import parseString, Document
 import re
 import requests
 
-# Methods
-
-AUTH = 'Auth'
-COMPLETE = 'Complete'
-PURCHASE = 'Purchase'
-REFUND = 'Refund'
-VALIDATE = 'Validate'
-
-UNABLE_TO_FULFILL_TRANSACTION = 'Unable to fulfill transaction'
-
-
 class Request(object):
 	"""
 	Represents a GenerateRequest request.
 	First request to PaymentExpress of two.
 	"""
-	root_element='GenerateRequest'
+	ROOT_ELEMENT = 'GenerateRequest'
+	REQUEST_FILEDS = [
+		'TxnId',
+		'TxnType',
+		'MerchantReference',
+		'TxnData1',
+		'TxnData2',
+		'TxnData3',
+		'AmountInput',
+		'CurrencyInput',
+		'EnableAddBillCard',
+		'BillingId',
+		'Opt',
+		'UrlFail',
+		'UrlSuccess'
+	]
 	
-	def __init__(self, userid, passkey, currency, txn_type, kwargs):
+	def __init__(self, userid, passkey, txn, kwargs):
+		txn.state = 'GenerateRequest'
+		txn.save()
 		self.data = {}
-		self.required_keys = [
-			'userid',
-			'passkey',
-			'amount',
-			'currency',
-			'txn_type',
-			'url_fail',
-			'url_success',
-		]
-		self.field_map = {
-			'userid': 'PxPayUserId',
-			'passkey': 'PxPayKey',
-			'amount': 'AmountInput',
-			'billing_id': 'BillingId',
-			'currency': 'CurrencyInput',
-			'email': 'EmailAddress',
-			'enable_add_bill_card': 'EnableAddBillCard',
-			'merchant_ref': 'MerchantReference',
-			'txn_data1': 'TxnData1',
-			'txn_data2': 'TxnData2',
-			'txn_data3': 'TxnData3',
-			'txn_type': 'TxnType',
-			'txn_id': 'TxnId',
-			'url_fail': 'UrlFail',
-			'url_success': 'UrlSuccess',
-			'opt': 'Opt',
-		}
 		self.set_auth(userid, passkey)
-		self.set_element('currency', currency)
-		self.set_element('txn_type', txn_type)
+		for element in txn._meta.get_all_field_names():
+			if element in self.REQUEST_FILEDS:
+				self.set_element(element, getattr(txn, element, None))
 		for element in kwargs:
-			self.set_element(element, kwargs[element])
+			if element in self.REQUEST_FILEDS:
+				self.set_element(element, kwargs[element])
 
 	@property
 	def request_xml(self):
 		doc = Document()
-		root = doc.createElement(self.root_element)
+		root = doc.createElement(self.ROOT_ELEMENT)
 		doc.appendChild(root)
 		for key, value in self.data.items():
-			field = self.field_map.get(key)
-			self._create_element(doc, root, field, value)
+			self._create_element(doc, root, key, value=value)
 		return doc.toxml()
 
 	def set_auth(self, userid, passkey):
-		self.set_element('userid', userid)
-		self.set_element('passkey', passkey)
+		self.set_element('PxPayUserId', userid)
+		self.set_element('PxPayKey', passkey)
 
 	def set_element(self, name, value):
 		self.data[name] = value
@@ -87,46 +67,52 @@ class Request(object):
 	def __unicode__(self):
 		return self.request_xml
 
-	def __str__(self):
-		return self.__unicode__()
 
-
-class Response_Request(Request):
+class ProcessResponse_Request(Request):
 	"""
 	A ProcessResponse Request. The second of two.
 	How weird is that class name?
 	"""
-	root_element='ProcessResponse'
+	ROOT_ELEMENT='ProcessResponse'
 	
-	def __init__(self, userid, passkey, response):
+	def __init__(self, userid, passkey, txn, kwargs):
+		txn.state = 'ProcessResponse'
+		txn.save()
 		self.data = {}
-		self.required_keys = [
-			'userid',
-			'passkey',
-			'response',
-		]
-		self.field_map = {
-			'userid': 'PxPayUserId',
-			'passkey': 'PxPayKey',
-			'response': 'Response',
-		}
 		self.set_auth(userid, passkey)
-		self.set_element('response', response)
+		self.set_element('Response', kwargs.get('result'))
 
 
 class Response(object):
 	"""
 	Encapsulate a PxPay response.
 	"""
-	def __init__(self, request_xml, response_xml):
+	RESPONSE_FILEDS = [
+		'AmountSettlement',
+		'AuthCode',
+		'DpsTxnRef',
+		'Success',
+		'ResponseText',
+		'DpsBillingId',
+		'CurrencySettlement',
+		'ClientInfo',
+		'TxnMac',
+		'BillingId'
+	]
+	
+	def __init__(self, request_xml, response_xml, txn):
 		self.request_xml = request_xml
 		self.response_xml = response_xml
 		self.response_parsed = self._extract_data(self.response_xml)
+		for element in self.response_parsed.firstChild.childNodes:
+			if element.nodeName in self.RESPONSE_FILEDS:
+				val = self._get_element_val(element)
+				if val is not None and val != '':
+					setattr(txn, element.nodeName, val)
+		txn.save()
 
 	def _extract_data(self, response_xml):
-		if response_xml == '' \
-			or response_xml == '<?xml version="1.0" ?>' \
-			or response_xml is None:
+		if response_xml == '' or response_xml == '<?xml version="1.0" ?>' or response_xml is None:
 			return None
 		return parseString(response_xml)
 	
@@ -134,14 +120,14 @@ class Response(object):
 	def get_data(self):
 		if self.is_valid:
 			data = {}
-			for el in self.response_parsed.firstChild.childNodes:
-				data[el.nodeName] = self._get_element_val(el)
+			for element in self.response_parsed.firstChild.childNodes:
+				data[element.nodeName] = self._get_element_val(element)
 			return data
 		return None
 
-	def _get_element_val(self, el):
-		if el.firstChild:
-			return el.firstChild.data
+	def _get_element_val(self, element):
+		if element.firstChild:
+			return element.firstChild.data
 		return None
 
 	@property
@@ -156,97 +142,41 @@ class Gateway(object):
 	"""
 	Transport class and entry point.
 	"""
-	def __init__(self):
-		self.pxpay_url = self._get_settings('PXPAY_URL')
-		self.userid = self._get_settings('PXPAY_USERID')
-		self.passkey = self._get_settings('PXPAY_KEY')
-		self.currency = self._get_settings('PXPAY_CURRENCY')
+	def __init__(self, **kwargs):
+		try:
+			self.pxpay_url = kwargs.get('PXPAY_URL', getattr(settings, 'PXPAY_URL'))
+		except AttributeError:
+			raise KeyError("No PXPAY_URL set. Please provide PXPAY_URL as an argument or specify it in settings")
+		try:
+			self.userid = kwargs.get('PXPAY_USERID', getattr(settings, 'PXPAY_USERID'))
+		except AttributeError:
+			raise KeyError("No PXPAY_USERID set. Please provide PXPAY_USERID as an argument or specify it in settings")
+		try:
+			self.passkey = kwargs.get('PXPAY_KEY', getattr(settings, 'PXPAY_KEY'))
+		except AttributeError:
+			raise KeyError("No PXPAY_KEY set. Please provide PXPAY_KEY as an argument or specify it in settings")
 
-	def _get_settings(self, name):
-		return getattr(settings, name, Exception("Please specify %s in settings." % name))
-
-	def _fetch_response(self, request):
-		self._check_kwargs(request.data, request.required_keys)
+	def _fetch_response(self, request, txn):
 		response = requests.post(self.pxpay_url, request.request_xml)
-		return Response(request.request_xml, response.text)
+		return Response(request.request_xml, response.text, txn)
 
-	def _check_kwargs(self, kwargs, required_keys):
-		for key in required_keys:
-			if key not in kwargs:
-				raise ValueError('You must provide a "%s" argument' % key)
-
-		for key in kwargs:
-			value = kwargs[key]
-			if key == 'currency' and value not in [k[0] for k in CURRENCY_CHOICES]:
-				raise ValueError('Currency code must be a 3 character code')
-			if key == 'amount' and value == 0:
-				raise ValueError('Amount must be non-zero')
-			if key in ('card_issue_date', 'card_expiry') \
-				and value is not None \
-				and not re.match(r'^(0[1-9]|1[012])([0-9]{2})$', value):
-				raise ValueError('%s must be in format mmyy' % key)
-
-	def _get_request(self, txn_type, kwargs, required_keys):
-		self._check_kwargs(kwargs, required_keys)
-		request = Request(self.userid, self.passkey, self.currency, txn_type, kwargs)
-		for key in required_keys:
-			request.set_element(key, kwargs.get(key))
-		return request
-
-	def authorise(self, **kwargs):
+	def process(self, txn, **kwargs):
 		"""
-		Authorizes a transaction.
-		Must be completed within 7 days using the "Complete" TxnType
+		Payment Gateway entry-point
 		"""
-		request = self._get_request(AUTH, kwargs, [
-			'card_holder', 'card_number', 'cvc2', 'amount',
-		])
-		return self._fetch_request_response(request)
+		request = Request(self.userid, self.passkey, txn, kwargs)
+		ret = self._fetch_response(request, txn)
+		txn.state = 'RequestSent'
+		txn.save()
+		return ret
 
-	def complete(self, **kwargs):
-		"""
-		Completes (settles) a pre-approved Auth Transaction.
-		The DpsTxnRef value returned by the original approved Auth transaction
-		must be supplied.
-		"""
-		request = self._get_request(COMPLETE, kwargs, ['dps_txn_ref', ])
-		return self._fetch_request_response(request)
-
-	def purchase(self, **kwargs):
-		"""
-		Purchase - Funds are transferred immediately.
-		"""
-		request = self._get_request(PURCHASE, kwargs, [
-			'merchant_ref', 'url_fail', 'url_success'
-		])
-		return self._fetch_response(request)
-
-	def process_response(self, **kwargs):
+	def process_response(self, txn, **kwargs):
 		"""
 		Post-processing transaction validation.
 		"""
-		self._check_kwargs(kwargs, ['result'])
-		request = Response_Request(self.userid, self.passkey, kwargs.get('result'))
-		return self._fetch_response(request)
-
-	def validate(self, **kwargs):
-		"""
-		Validation Transaction.
-		Effects a $1.00 Auth to validate card details including expiry date.
-		Often utilised with the EnableAddBillCard property set to 1 to
-		automatically add to Billing Database if the transaction is approved.
-		"""
-		request = self._get_request(AUTH, kwargs, [
-			'card_holder', 'card_number', 'cvc2', 'card_expiry',
-		])
-		return self._fetch_request_response(request)
-
-	def refund(self, **kwargs):
-		"""
-		Refund - Funds transferred immediately.
-		Must be enabled as a special option.
-		"""
-		request = self._get_request(REFUND, kwargs, [
-			'dps_txn_ref', 'merchant_ref',
-		])
-		return self._fetch_request_response(request)
+		request = ProcessResponse_Request(self.userid, self.passkey, txn, kwargs)
+		ret = self._fetch_response(request, txn)
+		txn.state = 'Complete'
+		txn.complete = True
+		txn.save()
+		return ret
