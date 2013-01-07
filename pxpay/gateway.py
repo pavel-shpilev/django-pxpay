@@ -93,6 +93,7 @@ class Response(object):
 		'DpsTxnRef',
 		'Success',
 		'ResponseText',
+		'Response',
 		'DpsBillingId',
 		'CurrencySettlement',
 		'ClientInfo',
