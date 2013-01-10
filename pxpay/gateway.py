@@ -143,10 +143,7 @@ class Gateway(object):
 	Transport class and entry point.
 	"""
 	def __init__(self, **kwargs):
-		try:
-			self.pxpay_url = kwargs.get('PXPAY_URL', getattr(settings, 'PXPAY_URL'))
-		except AttributeError:
-			raise KeyError("No PXPAY_URL set. Please provide PXPAY_URL as an argument or specify it in settings")
+		self.pxpay_url = 'https://sec2.paymentexpress.com/pxpay/pxaccess.aspx'
 		try:
 			self.userid = kwargs.get('PXPAY_USERID', getattr(settings, 'PXPAY_USERID'))
 		except AttributeError:
