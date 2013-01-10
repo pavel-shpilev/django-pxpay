@@ -10,6 +10,7 @@ and, optionally, `PXPAY_CURRENCY`.
 
 ```python
 from django.shortcuts import redirect, render_to_response
+from django.template.context import RequestContext
 from django.http import Http404
 from pxpay.gateway import Gateway
 
