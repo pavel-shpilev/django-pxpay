@@ -1,5 +1,5 @@
 from django.conf import settings
-from pxpay.models import CURRENCY_CHOICES, TXN_TYPE_CHOICES
+from pxpay.models import CURRENCY_CHOICES, TXN_TYPE_CHOICES, Transaction
 from xml.dom.minidom import parseString, Document
 import re
 import requests
@@ -75,12 +75,10 @@ class ProcessResponse_Request(Request):
 	"""
 	ROOT_ELEMENT='ProcessResponse'
 	
-	def __init__(self, userid, passkey, txn, kwargs):
-		txn.state = 'ProcessResponse'
-		txn.save()
+	def __init__(self, userid, passkey, kwargs):
 		self.data = {}
 		self.set_auth(userid, passkey)
-		self.set_element('Response', kwargs.get('result'))
+		self.set_element('Response', kwargs.get('Response'))
 
 
 class Response(object):
@@ -93,7 +91,6 @@ class Response(object):
 		'DpsTxnRef',
 		'Success',
 		'ResponseText',
-		'Response',
 		'DpsBillingId',
 		'CurrencySettlement',
 		'ClientInfo',
@@ -101,10 +98,12 @@ class Response(object):
 		'BillingId'
 	]
 	
-	def __init__(self, request_xml, response_xml, txn):
+	def __init__(self, request_xml, response_xml, txn=None):
 		self.request_xml = request_xml
 		self.response_xml = response_xml
 		self.response_parsed = self._extract_data(self.response_xml)
+		if not txn:
+			txn = Transaction.objects.get(TxnId=self.get_data['TxnId'])
 		for element in self.response_parsed.firstChild.childNodes:
 			if element.nodeName in self.RESPONSE_FILEDS:
 				val = self._get_element_val(element)
@@ -157,26 +156,42 @@ class Gateway(object):
 		except AttributeError:
 			raise KeyError("No PXPAY_KEY set. Please provide PXPAY_KEY as an argument or specify it in settings")
 
-	def _fetch_response(self, request, txn):
+	def _fetch_response(self, request, txn=None):
 		response = requests.post(self.pxpay_url, request.request_xml)
-		return Response(request.request_xml, response.text, txn)
+		return Response(request.request_xml, response.text, txn=txn)
 
-	def process(self, txn, **kwargs):
+	def transaction(self, **kwargs):
+		if kwargs.get('TxnId'):
+			txn = Transaction.objects.get(TxnId__exact=kwargs.get('TxnId'))
+		else:
+			return Transaction.objects.create(**kwargs)
+		# Generate a new transaction if attributes had changed before transaction completed
+		if not txn.complete:
+			for key, value in kwargs.iteritems():
+				if key != 'TxnId' and getattr(txn, key) != value:
+					del kwargs['TxnId']
+					txn = Transaction.objects.create(**kwargs)
+					break
+		txn.save()
+		return txn
+
+	def process_transaction(self, txn, **kwargs):
 		"""
-		Payment Gateway entry-point
+		Sends payment request
 		"""
 		request = Request(self.userid, self.passkey, txn, kwargs)
-		ret = self._fetch_response(request, txn)
+		ret = self._fetch_response(request, txn=txn)
 		txn.state = 'RequestSent'
 		txn.save()
 		return ret
 
-	def process_response(self, txn, **kwargs):
+	def process_response(self, **kwargs):
 		"""
 		Post-processing transaction validation.
 		"""
-		request = ProcessResponse_Request(self.userid, self.passkey, txn, kwargs)
-		ret = self._fetch_response(request, txn)
+		request = ProcessResponse_Request(self.userid, self.passkey, kwargs)
+		ret = self._fetch_response(request)
+		txn = Transaction.objects.get(TxnId=ret.get_data['TxnId'])
 		txn.state = 'Complete'
 		txn.complete = True
 		txn.save()
