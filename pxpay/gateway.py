@@ -69,9 +69,8 @@ class Request(object):
         return self.request_xml
 
 
-class ProcessResponse_Request(Request):
-    """A ProcessResponse Request. The second of two.
-    How weird is that class name?
+class ProcessResponse(Request):
+    """A ProcessResponse Request. The second subsequent request.
 
     """
 
@@ -195,7 +194,7 @@ class Gateway(object):
         """Post-processing transaction validation.
 
         """
-        request = ProcessResponse_Request(self.userid, self.passkey, kwargs)
+        request = ProcessResponse(self.userid, self.passkey, kwargs)
         ret = self._fetch_response(request)
         txn = Transaction.objects.get(TxnId=ret.get_data['TxnId'])
         txn.state = 'Complete'
