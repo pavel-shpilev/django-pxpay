@@ -61,4 +61,5 @@ def payment_result(request, success, msg):
         'payment.html',
         {'success': success, 'msg': msg},
         context_instance=RequestContext(request))
+
 ```
