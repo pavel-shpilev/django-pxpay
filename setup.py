@@ -8,7 +8,7 @@ setup(
     author="Pavel Shpilev",
     author_email="p.shpilev@gmail.com",
     description="PaymentExpress PxPay Gateway for Django",
-    long_description=read('README.md'),
+    long_description=read('README.rst'),
     keywords="PxPay, Payment, PaymentExpress, DPS, Django, Python",
     license='BSD',
     packages=find_packages(exclude=['test']),
