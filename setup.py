@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(name='django-pxpay',
       version='0.2',
-      url='https://github.com/pavel-shpilev/django-pxpay',
+      url='https://github.com/pavel-shpilev/django-pxpay.git',
       author="Pavel Shpilev",
       author_email="p.shpilev@gmail.com",
       description="PaymentExpress PxPay Gateway for Django",
