@@ -3,12 +3,20 @@ django-pxpay
 
 PaymentExpress PxPay Gateway for Django
 
-# Usage:
+Installation:
+-------------
 
-You'll need to add a few items in your `settings.py`: `PXPAY_USERID`,
-`PXPAY_KEY` and, optionally, `PXPAY_CURRENCY`.
+``pip install django-pxpay``
+or
+``easy_install django-pxpay``
 
-```python
+Usage:
+------
+
+You'll need to add a few items in your ``settings.py``: ``PXPAY_USERID``,
+``PXPAY_KEY`` and, optionally, ``PXPAY_CURRENCY``.
+
+``
 from django.shortcuts import redirect, render_to_response
 from django.template.context import RequestContext
 from django.http import Http404
@@ -62,4 +70,4 @@ def payment_result(request, success, msg):
         {'success': success, 'msg': msg},
         context_instance=RequestContext(request))
 
-```
+``
