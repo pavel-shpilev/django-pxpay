@@ -17,6 +17,7 @@ You'll need to add a few items in your ``settings.py``: ``PXPAY_USERID``,
 ``PXPAY_KEY`` and, optionally, ``PXPAY_CURRENCY``.
 
 .. code-block:: python
+
 from django.shortcuts import redirect, render_to_response
 from django.template.context import RequestContext
 from django.http import Http404
