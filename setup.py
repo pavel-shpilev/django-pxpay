@@ -2,7 +2,7 @@
 from setuptools import setup
 
 setup(name='django-pxpay',
-      version='0.1',
+      version='0.2',
       url='https://github.com/pavel-shpilev/django-pxpay',
       author="Pavel Shpilev",
       author_email="p.shpilev@gmail.com",
@@ -10,7 +10,7 @@ setup(name='django-pxpay',
       long_description=open('README.md').read(),
       keywords="PxPay, Payment, PaymentExpress, DPS, Django, Python",
       license='BSD',
-      packages=['pxpay',],
+      packages=['pxpay', ],
       install_requires=['requests>=0.13.5', 'django>=1.4'],
       include_package_data=True,
       # See http://pypi.python.org/pypi?%3Aaction=list_classifiers
@@ -19,5 +19,4 @@ setup(name='django-pxpay',
                    'Intended Audience :: Developers',
                    'License :: OSI Approved :: BSD License',
                    'Operating System :: OS Independent',
-                   'Programming Language :: Python']
-      )
+                   'Programming Language :: Python'])
