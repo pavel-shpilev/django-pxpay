@@ -6,9 +6,9 @@ import requests
 
 
 class Request(object):
-    """Represents a GenerateRequest request.
+    """
+    Represents a GenerateRequest request.
     First request to PaymentExpress of two.
-
     """
 
     ROOT_ELEMENT = 'GenerateRequest'
@@ -70,8 +70,8 @@ class Request(object):
 
 
 class ProcessResponse(Request):
-    """A ProcessResponse Request. The second subsequent request.
-
+    """
+    A ProcessResponse Request. The second subsequent request.
     """
 
     ROOT_ELEMENT = 'ProcessResponse'
@@ -83,8 +83,8 @@ class ProcessResponse(Request):
 
 
 class Response(object):
-    """Encapsulate a PxPay response.
-
+    """
+    Encapsulate a PxPay response.
     """
 
     RESPONSE_FILEDS = [
@@ -142,9 +142,10 @@ class Response(object):
 
 
 class Gateway(object):
-    """Transport class and the entry point.
-
     """
+    Transport class and the entry point.
+    """
+
     def __init__(self, **kwargs):
         self.pxpay_url = 'https://sec2.paymentexpress.com/pxpay/pxaccess.aspx'
         try:
@@ -181,8 +182,8 @@ class Gateway(object):
         return txn
 
     def process_transaction(self, txn, **kwargs):
-        """Sends payment request
-
+        """
+        Sends payment request
         """
         request = Request(self.userid, self.passkey, txn, kwargs)
         ret = self._fetch_response(request, txn=txn)
@@ -191,8 +192,8 @@ class Gateway(object):
         return ret
 
     def process_response(self, **kwargs):
-        """Post-processing transaction validation.
-
+        """
+        Post-processing transaction validation.
         """
         request = ProcessResponse(self.userid, self.passkey, kwargs)
         ret = self._fetch_response(request)
