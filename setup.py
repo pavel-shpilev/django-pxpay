@@ -9,7 +9,7 @@ def read(fname):
 
 setup(
     name='django-pxpay',
-    version='0.2.1',
+    version='0.2.2',
     url='http://github.com/pavel-shpilev/django-pxpay',
     author="Pavel Shpilev",
     author_email="p.shpilev@gmail.com",

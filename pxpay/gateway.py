@@ -162,7 +162,8 @@ class Gateway(object):
                            argument or specify it in settings')
 
     def _fetch_response(self, request, txn=None):
-        response = requests.post(self.pxpay_url, request.request_xml)
+        response = requests.post(self.pxpay_url, request.request_xml,
+                                 verify=False)
         return Response(request.request_xml, response.text, txn=txn)
 
     def transaction(self, **kwargs):
