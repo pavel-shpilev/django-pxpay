@@ -56,14 +56,14 @@ class Request(object):
         self.data[name] = value
 
     def _create_element(self, doc, parent, tag, value=None, attributes=None):
-        ele = doc.createElement(tag)
-        parent.appendChild(ele)
+        element = doc.createElement(tag)
+        parent.appendChild(element)
         if value:
             text = doc.createTextNode(str(value))
-            ele.appendChild(text)
+            element.appendChild(text)
         if attributes:
-            [ele.setAttribute(k, v) for k, v in attributes.items()]
-        return ele
+            [element.setAttribute(k, v) for k, v in attributes.items()]
+        return element
 
     def __unicode__(self):
         return self.request_xml
@@ -135,10 +135,10 @@ class Response(object):
 
     @property
     def is_valid(self):
-        ele = self.response_parsed.firstChild
-        if ele is None or ele.attributes is None:
+        element = self.response_parsed.firstChild
+        if element is None or element.attributes is None:
             return False
-        return int(ele.attributes.get('valid').value) == 1
+        return int(element.attributes.get('valid').value) == 1
 
 
 class Gateway(object):
@@ -187,19 +187,19 @@ class Gateway(object):
         Sends payment request
         """
         request = Request(self.userid, self.passkey, txn, kwargs)
-        ret = self._fetch_response(request, txn=txn)
+        response = self._fetch_response(request, txn=txn)
         txn.state = 'RequestSent'
         txn.save()
-        return ret
+        return response
 
     def process_response(self, **kwargs):
         """
         Post-processing transaction validation.
         """
         request = ProcessResponse(self.userid, self.passkey, kwargs)
-        ret = self._fetch_response(request)
-        txn = Transaction.objects.get(TxnId=ret.get_data['TxnId'])
+        response = self._fetch_response(request)
+        txn = Transaction.objects.get(TxnId=response.get_data['TxnId'])
         txn.state = 'Complete'
         txn.complete = True
         txn.save()
-        return ret
+        return response

@@ -9,7 +9,7 @@ def read(fname):
 
 setup(
     name='django-pxpay',
-    version='0.2.2',
+    version='0.2.3',
     url='http://github.com/pavel-shpilev/django-pxpay',
     author="Pavel Shpilev",
     author_email="p.shpilev@gmail.com",
@@ -18,7 +18,7 @@ setup(
     keywords="PxPay, Payment, PaymentExpress, DPS, Django, Python",
     license='BSD',
     packages=find_packages(exclude=['test']),
-    install_requires=['requests>=0.13.5', 'django>=1.4'],
+    install_requires=['requests>=0.13.5', 'django>=1.4.3'],
     include_package_data=True,
     classifiers=['Environment :: Web Environment',
                  'Framework :: Django',
