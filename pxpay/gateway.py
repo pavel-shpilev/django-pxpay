@@ -202,8 +202,12 @@ class Gateway(object):
         """
         request = ProcessResponse(self.userid, self.passkey, kwargs)
         response = self._fetch_response(request)
-        txn = Transaction.objects.get(TxnId=response.get_data['TxnId'])
-        txn.state = 'Complete'
-        txn.complete = True
-        txn.save()
+        try:
+            txn = Transaction.objects.get(TxnId=response.get_data['TxnId'])
+        except:
+            txn = None
+        if txn is not None:
+            txn.state = 'Complete'
+            txn.complete = True
+            txn.save()
         return response
