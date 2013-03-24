@@ -104,13 +104,17 @@ class Response(object):
         self.response_xml = response_xml
         self.response_parsed = self._extract_data(self.response_xml)
         if not txn:
-            txn = Transaction.objects.get(TxnId=self.get_data['TxnId'])
-        for element in self.response_parsed.firstChild.childNodes:
-            if element.nodeName in self.RESPONSE_FILEDS:
-                val = self._get_element_val(element)
-                if val is not None and val != '':
-                    setattr(txn, element.nodeName, val)
-        txn.save()
+            try:
+                txn = Transaction.objects.get(TxnId=self.get_data['TxnId'])
+            except:
+                txn = None
+        if txn is not None:
+            for element in self.response_parsed.firstChild.childNodes:
+                if element.nodeName in self.RESPONSE_FILEDS:
+                    val = self._get_element_val(element)
+                    if val is not None and val != '':
+                        setattr(txn, element.nodeName, val)
+            txn.save()
 
     def _extract_data(self, response_xml):
         if (response_xml == '' or
